@@ -14,6 +14,11 @@ import html
 
 app = FastAPI(title="SatQuery AI")
 
+
+# ---------------------------------------------------------
+# UPLOAD FOLDER
+# ---------------------------------------------------------
+
 os.makedirs("uploads", exist_ok=True)
 
 app.mount(
@@ -33,23 +38,24 @@ def home():
     return """
     <!DOCTYPE html>
     <html>
-
     <head>
+
         <title>SatQuery AI</title>
 
         <style>
 
             body {
-                margin: 0;
                 font-family: Arial, sans-serif;
                 background: #f4f7fb;
-                color: #172033;
+                margin: 0;
+                padding: 0;
             }
 
             .header {
                 background: #0b1f3a;
                 color: white;
-                padding: 22px 50px;
+                padding: 30px;
+                text-align: center;
             }
 
             .header h1 {
@@ -58,13 +64,13 @@ def home():
             }
 
             .header p {
-                margin: 6px 0 0;
+                margin-top: 8px;
                 color: #c9d6e8;
             }
 
             .container {
                 max-width: 900px;
-                margin: 45px auto;
+                margin: 40px auto;
                 padding: 0 25px;
             }
 
@@ -82,66 +88,62 @@ def home():
 
             label {
                 display: block;
-                margin-top: 25px;
+                margin-top: 20px;
                 margin-bottom: 8px;
                 font-weight: bold;
             }
 
             input[type="file"],
-            input[type="text"] {
+            textarea {
                 width: 100%;
                 box-sizing: border-box;
-                padding: 13px;
+                padding: 12px;
                 border: 1px solid #ccd5e0;
                 border-radius: 8px;
                 font-size: 15px;
             }
 
+            textarea {
+                min-height: 100px;
+                resize: vertical;
+            }
+
             button {
-                margin-top: 28px;
+                margin-top: 25px;
                 width: 100%;
                 padding: 14px;
+                background: #0b1f3a;
+                color: white;
                 border: none;
                 border-radius: 8px;
-                background: #1769aa;
-                color: white;
-                font-size: 16px;
-                font-weight: bold;
+                font-size: 17px;
                 cursor: pointer;
             }
 
             button:hover {
-                background: #12588e;
+                background: #173b6d;
             }
 
             .info {
-                margin-top: 25px;
+                background: #eef5ff;
                 padding: 15px;
-                background: #eef5fb;
                 border-radius: 8px;
-                font-size: 14px;
-            }
-
-            .footer {
-                text-align: center;
-                margin-top: 30px;
-                color: #718096;
-                font-size: 13px;
+                margin-bottom: 20px;
             }
 
         </style>
 
     </head>
 
-
     <body>
 
         <div class="header">
 
-            <h1>🛰️ SatQuery AI</h1>
+            <h1>SatQuery AI</h1>
 
             <p>
-                Interactive Vision-Language Assistant for Remote Sensing
+                Interactive Vision-Language Assistant for
+                Multimodal Remote Sensing Image Analysis
             </p>
 
         </div>
@@ -151,20 +153,30 @@ def home():
 
             <div class="card">
 
-                <h2>Analyze Satellite Imagery</h2>
+                <h2>Satellite Image Analysis</h2>
 
-                <p>
-                    Upload a satellite image and ask a question
-                    using natural language.
-                </p>
+                <div class="info">
+
+                    Ask a question about your satellite image
+                    in natural language.
+
+                    <br><br>
+
+                    Examples:
+
+                    <br>
+                    • What can you see in this image?
+                    <br>
+                    • Where is the water body?
+                    <br>
+                    • What changed between these two satellite images?
+                    <br>
+                    • Use optical and SAR together to analyze this scene.
+
+                </div>
 
 
-                <form
-                    action="/analyze"
-                    method="post"
-                    enctype="multipart/form-data"
-                >
-
+                <form action="/analyze" method="post" enctype="multipart/form-data">
 
                     <label>
                         Satellite Image
@@ -203,52 +215,46 @@ def home():
 
 
                     <label>
-                        Your Question
+                        Ask your question
                     </label>
 
-                    <input
-                        type="text"
+                    <textarea
                         name="question"
-                        placeholder="Example: What can you see in this image?"
+                        placeholder="Example: What can you see in this satellite image?"
                         required
-                    >
+                    ></textarea>
 
 
                     <button type="submit">
-                        🔍 Analyze Image
+                        Analyze Satellite Image
                     </button>
 
                 </form>
-
-
-                <div class="info">
-
-                    <b>Supported:</b>
-
-                    Optical / multispectral / SAR image formats
-                    can be integrated into the full SatQuery AI pipeline.
-
-                </div>
-
-            </div>
-
-
-            <div class="footer">
-
-                SatQuery AI • SIH 2026 • Remote Sensing Intelligence
 
             </div>
 
         </div>
 
     </body>
-
     </html>
     """
 
 
 # ---------------------------------------------------------
-# ANALYZE
+# HEALTH CHECK
+# ---------------------------------------------------------
+
+@app.get("/health")
+def health():
+
+    return {
+        "status": "ok",
+        "application": "SatQuery AI"
+    }
+
+
+# ---------------------------------------------------------
+# ANALYSIS ENDPOINT
 # ---------------------------------------------------------
 
 @app.post("/analyze", response_class=HTMLResponse)
@@ -264,26 +270,16 @@ async def analyze(
 
 ):
 
-    os.makedirs("uploads", exist_ok=True)
-
-
     # -----------------------------------------------------
-    # SAVE MAIN OPTICAL IMAGE
+    # SAVE MAIN IMAGE
     # -----------------------------------------------------
 
-    safe_filename = os.path.basename(image.filename)
+    image_path = "uploads/main_image_" + image.filename
 
-    image_path = os.path.join(
-        "uploads",
-        safe_filename
-    )
-
+    image_content = await image.read()
 
     with open(image_path, "wb") as f:
-
-        content = await image.read()
-
-        f.write(content)
+        f.write(image_content)
 
 
     # -----------------------------------------------------
@@ -292,24 +288,14 @@ async def analyze(
 
     image2_path = None
 
-
     if image2 and image2.filename:
 
-        safe_filename2 = os.path.basename(
-            image2.filename
-        )
+        image2_path = "uploads/second_image_" + image2.filename
 
-        image2_path = os.path.join(
-            "uploads",
-            safe_filename2
-        )
-
+        image2_content = await image2.read()
 
         with open(image2_path, "wb") as f:
-
-            content2 = await image2.read()
-
-            f.write(content2)
+            f.write(image2_content)
 
 
     # -----------------------------------------------------
@@ -318,23 +304,13 @@ async def analyze(
 
     sar_image_path = None
 
-
     if sar_image and sar_image.filename:
 
-        safe_sar_filename = os.path.basename(
-            sar_image.filename
-        )
+        sar_image_path = "uploads/sar_" + sar_image.filename
 
-        sar_image_path = os.path.join(
-            "uploads",
-            safe_sar_filename
-        )
-
+        sar_content = await sar_image.read()
 
         with open(sar_image_path, "wb") as f:
-
-            sar_content = await sar_image.read()
-
             f.write(sar_content)
 
 
@@ -348,6 +324,19 @@ async def analyze(
 
 
     # -----------------------------------------------------
+    # RESULT VARIABLES
+    # -----------------------------------------------------
+
+    answer = None
+
+    evidence_path = None
+
+    change_percentage = None
+
+    optical_sar_result = None
+
+
+    # -----------------------------------------------------
     # VQA
     # -----------------------------------------------------
 
@@ -355,14 +344,12 @@ async def analyze(
 
         print("Running BLIP VQA...")
 
-
         answer = answer_question(
-
             image_path,
-
             question
-
         )
+
+        print("VQA Answer:", answer)
 
 
     # -----------------------------------------------------
@@ -373,26 +360,17 @@ async def analyze(
 
         print("Running grounding evidence...")
 
-
-        evidence_path = (
-            "uploads/grounding_evidence.jpg"
-        )
-
+        evidence_path = "uploads/grounding_evidence.jpg"
 
         create_grounding_evidence(
-
             image_path,
-
             evidence_path,
-
             question
-
         )
 
-
         answer = (
-            "The relevant region has been "
-            "highlighted in the image below."
+            "A visual grounding region has been generated "
+            "for the requested object or area."
         )
 
 
@@ -404,42 +382,27 @@ async def analyze(
 
         print("Running change analysis...")
 
-
         if image2_path:
 
-            change_map_path = (
-                "uploads/change_map.jpg"
-            )
+            evidence_path = "uploads/change_map.jpg"
 
-
-            (
-                change_map_path,
-                change_percentage
-            ) = create_change_map(
-
+            evidence_path, change_percentage = create_change_map(
                 image_path,
-
                 image2_path,
-
-                change_map_path
-
+                evidence_path
             )
-
 
             answer = (
-
                 f"Visual change detected: "
-                f"{change_percentage}% between "
-                f"the two satellite images."
-
+                f"{change_percentage}% of pixels "
+                f"differed between the two images."
             )
-
 
         else:
 
             answer = (
-                "Please upload a second satellite "
-                "image for change analysis."
+                "Please upload a second satellite image "
+                "to perform change analysis."
             )
 
 
@@ -449,165 +412,129 @@ async def analyze(
 
     elif task == "optical_sar":
 
-        print(
-            "Running Optical + SAR analysis..."
-        )
-
+        print("Running Optical + SAR analysis...")
 
         if sar_image_path:
 
-            answer = analyze_optical_sar(
-
+            optical_sar_result = analyze_optical_sar(
                 image_path,
-
                 sar_image_path
-
             )
 
+            answer = optical_sar_result
 
         else:
 
             answer = (
-                "Please upload a SAR image for "
-                "Optical + SAR analysis."
+                "Please upload a SAR image together with "
+                "the optical satellite image."
             )
 
 
     # -----------------------------------------------------
-    # OTHER TASK
+    # IF SAR IS PROVIDED WITH ANOTHER TASK
     # -----------------------------------------------------
 
-    else:
+    if sar_image_path and task != "optical_sar":
 
-        answer = (
+        print("SAR image detected.")
 
-            f"The SatQuery Agent detected "
-            f"this as '{task}'."
+        if task == "change_analysis":
 
-        )
-
-
-    print("AI Answer:", answer)
+            answer = (
+                answer
+                + "<br><br>"
+                + "<b>Note:</b> A SAR image was also uploaded. "
+                "For a complete multimodal Optical + SAR analysis, "
+                "use a question such as: "
+                "<i>Use optical and SAR together to analyze this scene.</i>"
+            )
 
 
     # -----------------------------------------------------
-    # SAFE HTML VALUES
+    # ESCAPE TEXT SAFELY
     # -----------------------------------------------------
 
-    safe_question = html.escape(
-        question
-    )
+    safe_question = html.escape(question)
+
+    if answer is None:
+
+        answer = "Analysis completed."
+
+    safe_answer = str(answer)
 
 
-    safe_answer = html.escape(
-        str(answer)
-    )
+    # -----------------------------------------------------
+    # EVIDENCE IMAGE HTML
+    # -----------------------------------------------------
+
+    evidence_html = ""
+
+    if evidence_path:
+
+        evidence_filename = os.path.basename(evidence_path)
+
+        evidence_html = f"""
+        <div class="evidence">
+
+            <h3>Visual Evidence</h3>
+
+            <img
+                src="/uploads/{html.escape(evidence_filename)}"
+                alt="Analysis Evidence"
+            >
+
+        </div>
+        """
 
 
-    safe_filename = html.escape(
-        safe_filename
-    )
+    # -----------------------------------------------------
+    # EXECUTION SUMMARY
+    # -----------------------------------------------------
 
+    execution_summary = f"""
+    <div class="summary">
 
-    safe_sar_filename = ""
+        <h3>Execution Summary</h3>
 
+        <p>
+            <b>User Query:</b>
+            {safe_question}
+        </p>
+
+        <p>
+            <b>Detected Task:</b>
+            {html.escape(str(task))}
+        </p>
+
+        <p>
+            <b>Primary Image:</b>
+            {html.escape(image.filename)}
+        </p>
+
+    """
+
+    if image2_path:
+
+        execution_summary += f"""
+        <p>
+            <b>Second Image:</b>
+            {html.escape(image2.filename)}
+        </p>
+        """
 
     if sar_image_path:
 
-        safe_sar_filename = html.escape(
-
-            os.path.basename(
-                sar_image_path
-            )
-
-        )
-
-
-    # -----------------------------------------------------
-    # EVIDENCE HTML
-    # -----------------------------------------------------
-
-    if task == "grounding":
-
-        evidence_html = """
-
-        <h2>
-            🔎 Grounding Evidence
-        </h2>
-
-        <img
-            src="/uploads/grounding_evidence.jpg"
-            alt="Grounding evidence"
-            style="
-                max-width:100%;
-                max-height:500px;
-                border-radius:12px;
-                margin:20px 0;
-            "
-        >
-
+        execution_summary += f"""
+        <p>
+            <b>SAR Image:</b>
+            {html.escape(sar_image.filename)}
+        </p>
         """
 
-
-    elif (
-        task == "change_analysis"
-        and image2_path
-    ):
-
-        evidence_html = """
-
-        <h2>
-            🔄 Change Analysis Evidence
-        </h2>
-
-        <img
-            src="/uploads/change_map.jpg"
-            alt="Change analysis map"
-            style="
-                max-width:100%;
-                max-height:500px;
-                border-radius:12px;
-                margin:20px 0;
-            "
-        >
-
-        """
-
-
-    else:
-
-        evidence_html = ""
-
-
-    # -----------------------------------------------------
-    # SAR IMAGE HTML
-    # -----------------------------------------------------
-
-    if safe_sar_filename:
-
-        sar_html = f"""
-
-        <h3>
-            📡 SAR Image
-        </h3>
-
-        <img
-            src="/uploads/{safe_sar_filename}"
-            alt="SAR image"
-            style="
-                max-width:100%;
-                max-height:500px;
-                border-radius:12px;
-                margin:20px 0;
-            "
-        >
-
-        """
-
-
-    else:
-
-        sar_html = ""
+    execution_summary += """
+    </div>
+    """
 
 
     # -----------------------------------------------------
@@ -615,88 +542,86 @@ async def analyze(
     # -----------------------------------------------------
 
     return f"""
-
     <!DOCTYPE html>
 
     <html>
 
     <head>
 
-        <title>
-            SatQuery AI Result
-        </title>
-
+        <title>SatQuery AI - Analysis Result</title>
 
         <style>
 
             body {{
-                margin: 0;
                 font-family: Arial, sans-serif;
                 background: #f4f7fb;
-                color: #172033;
+                margin: 0;
+                padding: 0;
             }}
-
 
             .header {{
                 background: #0b1f3a;
                 color: white;
-                padding: 22px 50px;
+                padding: 25px;
+                text-align: center;
             }}
-
-
-            .header h1 {{
-                margin: 0;
-                font-size: 32px;
-            }}
-
 
             .container {{
                 max-width: 900px;
-                margin: 45px auto;
+                margin: 35px auto;
                 padding: 0 25px;
             }}
 
-
             .card {{
                 background: white;
-                padding: 35px;
+                padding: 30px;
                 border-radius: 16px;
-                box-shadow:
-                    0 8px 25px
-                    rgba(0,0,0,0.08);
+                box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+                margin-bottom: 25px;
             }}
 
-
-            .question {{
-                background: #f4f7fb;
-                padding: 18px;
-                border-radius: 8px;
-                margin: 15px 0;
+            h2 {{
+                color: #0b1f3a;
+                margin-top: 0;
             }}
 
+            h3 {{
+                color: #173b6d;
+            }}
 
             .answer {{
                 background: #eef7ee;
-                border-left:
-                    5px solid #3c8d40;
                 padding: 20px;
-                border-radius: 8px;
+                border-radius: 10px;
                 font-size: 18px;
-                white-space: pre-line;
+                line-height: 1.6;
             }}
 
-
-            img {{
-                display: block;
+            .summary {{
+                background: #f5f7fa;
+                padding: 20px;
+                border-radius: 10px;
+                line-height: 1.6;
             }}
 
-
-            a {{
-                display: inline-block;
+            .evidence {{
                 margin-top: 25px;
-                color: #1769aa;
+            }}
+
+            .evidence img {{
+                max-width: 100%;
+                border-radius: 10px;
+                border: 1px solid #ddd;
+            }}
+
+            .back {{
+                display: inline-block;
+                margin-top: 20px;
+                padding: 12px 20px;
+                background: #0b1f3a;
+                color: white;
                 text-decoration: none;
-                font-weight: bold;
+                border-radius: 8px;
             }}
 
         </style>
@@ -706,12 +631,11 @@ async def analyze(
 
     <body>
 
-
         <div class="header">
 
-            <h1>
-                🛰️ SatQuery AI
-            </h1>
+            <h1>SatQuery AI</h1>
+
+            <p>Satellite Analysis Result</p>
 
         </div>
 
@@ -721,57 +645,7 @@ async def analyze(
 
             <div class="card">
 
-
-                <h2>
-                    Analysis Result
-                </h2>
-
-
-                <p>
-
-                    <b>
-                        Optical / Main Satellite Image:
-                    </b>
-
-                    {safe_filename}
-
-                </p>
-
-
-                <img
-                    src="/uploads/{safe_filename}"
-                    alt="Uploaded optical satellite image"
-                    style="
-                        max-width:100%;
-                        max-height:500px;
-                        border-radius:12px;
-                        margin:20px 0;
-                    "
-                >
-
-
-                {sar_html}
-
-
-                {evidence_html}
-
-
-                <h3>
-                    Your Question
-                </h3>
-
-
-                <div class="question">
-
-                    {safe_question}
-
-                </div>
-
-
-                <h3>
-                    🤖 AI Answer
-                </h3>
-
+                <h2>AI Answer</h2>
 
                 <div class="answer">
 
@@ -779,38 +653,30 @@ async def analyze(
 
                 </div>
 
+            </div>
 
-                <a href="/">
 
-                    ← Analyze another image
+            <div class="card">
 
+                {execution_summary}
+
+                {evidence_html}
+
+            </div>
+
+
+            <div class="card">
+
+                <a class="back" href="/">
+                    ← Analyze Another Image
                 </a>
-
 
             </div>
 
 
         </div>
 
-
     </body>
 
     </html>
-
     """
-
-
-# ---------------------------------------------------------
-# HEALTH CHECK
-# ---------------------------------------------------------
-
-@app.get("/health")
-def health():
-
-    return {
-
-        "status": "running",
-
-        "project": "SatQuery AI"
-
-    }
