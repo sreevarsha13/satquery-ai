@@ -2,7 +2,7 @@ from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from blip_vqa import answer_question
+
 from agent import detect_task
 from grounding import create_grounding_evidence
 from change_analysis import create_change_map
@@ -341,16 +341,16 @@ async def analyze(
     # -----------------------------------------------------
 
     if task == "vqa":
+       print("Running lightweight VQA demo...")
 
-        print("Running BLIP VQA...")
+       answer = (
+        "This satellite image contains visible land features. "
+        "For the full remote-sensing VQA analysis, the "
+        "RS-specific vision-language model can be connected "
+        "in the cloud version."
+       )
 
-        answer = answer_question(
-            image_path,
-            question
-        )
-
-        print("VQA Answer:", answer)
-
+       print("VQA Answer:", answer)
 
     # -----------------------------------------------------
     # GROUNDING
